@@ -1,0 +1,86 @@
+list_apis:
+  name: List LLM APIs
+  description: >-
+    List every LLM API registered in this Home Assistant instance, with the
+    number of tools each one exposes. Use it to find the api_id for the other
+    two actions.
+list_tools:
+  name: List LLM tools
+  description: >-
+    Describe the tools of one LLM API, or of every registered API. Each tool is
+    returned with its name, description and its parameters as a JSON schema —
+    the same description a conversation agent would be given.
+  fields:
+    api_id:
+      name: LLM API
+      description: >-
+        Restrict the listing to one API. Omit to list the tools of every
+        registered API.
+      required: false
+      example: mcp-notion
+      selector:
+        select:
+          # Filled at runtime from the registered LLM APIs; see
+          # _async_publish_api_options. Empty is honest until then — a
+          # hardcoded id would be wrong for every instance but the default one.
+          options: []
+    search:
+      name: Search
+      description: >-
+        Keep only tools whose name or description contains every word you
+        type, ignoring case. Listing every API unfiltered runs to hundreds of
+        tools, each with a JSON schema.
+      required: false
+      example: page
+      selector:
+        text:
+    limit:
+      name: Limit
+      description: >-
+        Keep at most this many tools. Applied after ranking, so a truncated
+        listing keeps the closest matches rather than an arbitrary slice.
+      required: false
+      example: 10
+      selector:
+        number:
+          min: 1
+          max: 500
+          mode: box
+call_tool:
+  name: Call LLM tool
+  description: >-
+    Run a single LLM tool directly, with no conversation agent and no model
+    inference. Returns whatever the tool returned. Use it when an automation,
+    script or sentence trigger already knows exactly which tool to run and with
+    which arguments.
+  fields:
+    api_id:
+      name: LLM API
+      description: >-
+        The API that provides the tool, as reported by List LLM APIs.
+        Required: resolving a bare tool name across APIs breaks the day a
+        second API registers the same name.
+      required: true
+      example: mcp-notion
+      selector:
+        select:
+          # Filled at runtime from the registered LLM APIs; see
+          # _async_publish_api_options. Empty is honest until then — a
+          # hardcoded id would be wrong for every instance but the default one.
+          options: []
+    tool:
+      name: Tool
+      description: Name of the tool to call, as reported by List LLM tools.
+      required: true
+      example: search
+      selector:
+        text:
+    args:
+      name: Arguments
+      description: >-
+        Arguments passed to the tool. Validated against the tool's own schema
+        before the tool runs.
+      required: false
+      example: '{"query": "Q3 roadmap", "page_size": 5}'
+      selector:
+        object:

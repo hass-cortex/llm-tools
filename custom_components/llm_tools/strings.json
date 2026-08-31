@@ -1,0 +1,55 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "LLM Tools",
+        "description": "This adds three actions for reading and running Home Assistant's LLM tools without a conversation agent. There is nothing to configure — the tools come from whichever integrations have registered an LLM API."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Already configured. Only a single configuration is possible."
+    }
+  },
+  "services": {
+    "list_apis": {
+      "name": "List LLM APIs",
+      "description": "List every LLM API registered in this Home Assistant instance, with the number of tools each one exposes. Use it to find the api_id for the other two actions."
+    },
+    "list_tools": {
+      "name": "List LLM tools",
+      "description": "Describe the tools of one LLM API, or of every registered API. Each tool is returned with its name, description and its parameters as a JSON schema — the same description a conversation agent would be given.",
+      "fields": {
+        "api_id": {
+          "name": "LLM API",
+          "description": "Restrict the listing to one API. Omit to list the tools of every registered API."
+        },
+        "search": {
+          "name": "Search",
+          "description": "Keep only tools whose name or description contains every word you type, ignoring case. Listing every API unfiltered runs to hundreds of tools, each with a JSON schema."
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Keep at most this many tools. Applied after ranking, so a truncated listing keeps the closest matches rather than an arbitrary slice."
+        }
+      }
+    },
+    "call_tool": {
+      "name": "Call LLM tool",
+      "description": "Run a single LLM tool directly, with no conversation agent and no model inference. Returns whatever the tool returned. Use it when an automation, script or sentence trigger already knows exactly which tool to run and with which arguments.",
+      "fields": {
+        "api_id": {
+          "name": "LLM API",
+          "description": "The API that provides the tool, as reported by List LLM APIs. Required: resolving a bare tool name across APIs breaks the day a second API registers the same name."
+        },
+        "tool": {
+          "name": "Tool",
+          "description": "Name of the tool to call, as reported by List LLM tools."
+        },
+        "args": {
+          "name": "Arguments",
+          "description": "Arguments passed to the tool. Validated against the tool's own schema before the tool runs."
+        }
+      }
+    }
+  }
+}

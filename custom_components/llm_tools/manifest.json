@@ -1,0 +1,22 @@
+{
+  "domain": "llm_tools",
+  "name": "LLM Tools",
+  "codeowners": [
+    "@parkghost"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "conversation",
+    "llm"
+  ],
+  "documentation": "https://github.com/hass-cortex/llm-tools",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/hass-cortex/llm-tools/issues",
+  "requirements": [
+    "voluptuous-openapi>=0.4.1",
+    "probatio>=0.11.4"
+  ],
+  "single_config_entry": true,
+  "version": "0.1.0"
+}

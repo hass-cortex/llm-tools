@@ -1,0 +1,13 @@
+{
+  "services": {
+    "list_apis": {
+      "service": "mdi:api"
+    },
+    "list_tools": {
+      "service": "mdi:toolbox-outline"
+    },
+    "call_tool": {
+      "service": "mdi:play-circle-outline"
+    }
+  }
+}

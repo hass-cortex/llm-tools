@@ -1,0 +1,176 @@
+rules:
+  # Bronze
+  action-setup: done
+  appropriate-polling:
+    status: exempt
+    comment: |
+      Nothing is polled. Tools are resolved on demand, per service call.
+  brands:
+    status: done
+    comment: |
+      The eight ALLOWED_IMAGES are in custom_components/llm_tools/brand/. Core's
+      `brands` component (2026.3, this integration's own minimum) serves a custom
+      integration's brand/ directory local-first at
+      /api/brands/integration/{domain}/{image} and only falls back to the CDN for
+      a file that is absent, so these are what the UI actually renders. Shipping
+      all eight also skips the IMAGE_FALLBACKS chain. Not submitted to
+      home-assistant/brands: still possible, but it buys nothing now.
+  common-modules: done
+  config-flow: done
+  config-flow-test-coverage: done
+  dependency-transparency: done
+  docs-actions: done
+  docs-conditions:
+    status: exempt
+    comment: |
+      Registers no conditions.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  docs-triggers:
+    status: exempt
+    comment: |
+      Registers no triggers.
+  entity-event-setup:
+    status: exempt
+    comment: |
+      No entities. This integration only registers actions.
+  entity-unique-id:
+    status: exempt
+    comment: |
+      No entities.
+  has-entity-name:
+    status: exempt
+    comment: |
+      No entities.
+  runtime-data:
+    status: exempt
+    comment: |
+      The config entry holds no runtime state. Everything is read from the
+      LLM API registry at call time.
+  test-before-configure:
+    status: exempt
+    comment: |
+      Nothing to connect to at configuration time.
+  test-before-setup:
+    status: exempt
+    comment: |
+      Nothing to connect to at setup time.
+  unique-config-entry: done
+
+  # Silver
+  action-exceptions: done
+  config-entry-unloading: done
+  docs-configuration-parameters:
+    status: exempt
+    comment: |
+      No configuration options.
+  docs-installation-parameters:
+    status: exempt
+    comment: |
+      No installation parameters.
+  entity-unavailable:
+    status: exempt
+    comment: |
+      No entities.
+  integration-owner: done
+  log-when-unavailable:
+    status: exempt
+    comment: |
+      No external service that can become unavailable.
+  parallel-updates:
+    status: exempt
+    comment: |
+      No entities.
+  reauthentication-flow:
+    status: exempt
+    comment: |
+      No credentials.
+  test-coverage: done
+
+  # Gold
+  devices:
+    status: exempt
+    comment: |
+      No devices.
+  diagnostics: done
+  discovery:
+    status: exempt
+    comment: |
+      Nothing to discover.
+  discovery-update-info:
+    status: exempt
+    comment: |
+      Nothing to discover.
+  docs-data-update:
+    status: exempt
+    comment: |
+      No periodic data updates.
+  docs-examples: done
+  docs-known-limitations: done
+  docs-supported-devices:
+    status: exempt
+    comment: |
+      Not a device integration.
+  docs-supported-functions: done
+  docs-troubleshooting: done
+  docs-use-cases: done
+  dynamic-devices:
+    status: exempt
+    comment: |
+      No devices.
+  entity-category:
+    status: exempt
+    comment: |
+      No entities.
+  entity-device-class:
+    status: exempt
+    comment: |
+      No entities.
+  entity-disabled-by-default:
+    status: exempt
+    comment: |
+      No entities.
+  entity-translations:
+    status: exempt
+    comment: |
+      No entities.
+  exception-translations:
+    status: todo
+    comment: |
+      Real gap, not an exemption: all eight raise sites pass a formatted string.
+      Migrating them means a strings.json `exceptions:` block with placeholders
+      for the dynamic parts (the registered-API list, the tool name) and
+      reworking the ~20 tests that assert on `str(err.value)` — the mocked
+      homeassistant in tests/conftest.py has no translation lookup, so they
+      would have to assert on translation_key and placeholders instead.
+  icon-translations: done
+  reconfiguration-flow:
+    status: exempt
+    comment: |
+      Nothing to reconfigure.
+  repair-issues:
+    status: exempt
+    comment: |
+      Nothing to repair. There is no external service to lose, no credential to
+      expire and no entity to go stale; every failure is per-call and already
+      surfaces on the call.
+  stale-devices:
+    status: exempt
+    comment: |
+      No devices.
+
+  # Platinum
+  async-dependency: done
+  inject-websession:
+    status: exempt
+    comment: |
+      No HTTP client.
+  strict-typing:
+    status: todo
+    comment: |
+      Not assessable here. `homeassistant` is not installed (it is mocked in
+      tests) so pyright is run with reportMissingImports = "none"; under
+      typeCheckingMode = "strict" that yields 277 errors, every one of them a
+      reportUnknown* on an HA symbol rather than a finding about this code.
+      Also needs a py.typed marker.
