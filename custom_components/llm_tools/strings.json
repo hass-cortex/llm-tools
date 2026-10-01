@@ -5,9 +5,6 @@
         "title": "LLM Tools",
         "description": "This adds three actions for reading and running Home Assistant's LLM tools without a conversation agent. There is nothing to configure — the tools come from whichever integrations have registered an LLM API."
       }
-    },
-    "abort": {
-      "single_instance_allowed": "Already configured. Only a single configuration is possible."
     }
   },
   "services": {
