@@ -23,9 +23,7 @@ test = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
-    "voluptuous>=0.15.0",
-    "voluptuous-openapi>=0.4.1",
-    "probatio>=0.11.4",
+    "probatio==0.12.4",
     "pyyaml>=6.0",
 ]
 dev = [
@@ -102,4 +100,4 @@ major_version_zero = true
 
 [dependency-groups]
 dev = ["ruff>=0.14.11", "pyright>=1.1.390", "commitizen>=4.0", "pre-commit>=4.0"]
-test = ["pytest>=9.0", "pytest-asyncio>=1.0", "pytest-cov>=7.0", "voluptuous>=0.15.0", "voluptuous-openapi>=0.4.1", "probatio>=0.11.4", "pyyaml>=6.0"]
+test = ["pytest>=9.0", "pytest-asyncio>=1.0", "pytest-cov>=7.0", "probatio==0.12.4", "pyyaml>=6.0"]

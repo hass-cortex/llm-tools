@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import MagicMock
 
+import probatio
 import pytest
-import voluptuous as vol
 from conftest import (
     DEFAULT_ASSISTANT,
     DOMAIN,
@@ -15,7 +15,6 @@ from conftest import (
 )
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import llm
-from voluptuous_openapi import UNSUPPORTED
 
 # =============================================================================
 # build_llm_context
@@ -68,55 +67,8 @@ class TestBuildLlmContext:
 # =============================================================================
 
 
-class TestSchemaSerializerDispatch:
-    """Choosing a serializer by the schema in hand, not by what is installed.
-
-    Home Assistant is mid-migration from voluptuous to probatio. 2026.9 hands
-    out `voluptuous.Schema`; the 2026.10 branch hands out probatio's. Neither
-    serializer accepts the other's schema, and both packages are declared, so
-    the choice cannot be made at import time.
-    """
-
-    def test_voluptuous_schema_is_serialized(self) -> None:
-        """A voluptuous schema round-trips through voluptuous-openapi."""
-        described = tool_registry.format_tool(
-            StubTool("Vol", parameters=vol.Schema({vol.Required("name"): str})), None
-        )
-
-        assert described["parameters"]["properties"] == {"name": {"type": "string"}}
-
-    def test_probatio_schema_is_serialized(self) -> None:
-        """A probatio schema round-trips through probatio.
-
-        voluptuous-openapi cannot read it, so a passing assertion here proves
-        the dispatch picked probatio rather than falling back to empty
-        parameters.
-        """
-        probatio = pytest.importorskip("probatio")
-        schema = probatio.Schema({probatio.Required("name"): str})
-
-        described = tool_registry.format_tool(StubTool("Prob", parameters=schema), None)
-
-        assert described["parameters"]["properties"] == {"name": {"type": "string"}}
-
-    def test_probatio_schema_is_tried_first(self) -> None:
-        """Dispatch order follows the schema's module."""
-        probatio = pytest.importorskip("probatio")
-        ordered = tool_registry._serializers_for(
-            type(probatio.Schema({probatio.Required("a"): str}))
-        )
-
-        assert ordered[0] is tool_registry._probatio_to_openapi
-
-    def test_voluptuous_schema_is_tried_first(self) -> None:
-        """The reverse: a voluptuous schema puts voluptuous-openapi first."""
-        ordered = tool_registry._serializers_for(type(vol.Schema({})))
-
-        assert ordered[0] is tool_registry._vol_openapi_convert
-
-
 class TestFormatTool:
-    """Rendering a tool's voluptuous schema as a JSON schema."""
+    """Rendering a tool's probatio schema as a JSON schema."""
 
     def test_empty_schema(self) -> None:
         """A tool with no parameters still reports an object schema."""
@@ -127,7 +79,7 @@ class TestFormatTool:
         assert described["parameters"] == {
             "type": "object",
             "properties": {},
-            "required": [],
+            "additionalProperties": False,
         }
 
     def test_title_and_annotations_are_reported(self) -> None:
@@ -167,10 +119,10 @@ class TestFormatTool:
         """Required and optional markers land in `required`."""
         tool = StubTool(
             "Mixed",
-            parameters=vol.Schema(
+            parameters=probatio.Schema(
                 {
-                    vol.Required("name"): str,
-                    vol.Optional("count"): int,
+                    probatio.Required("name"): str,
+                    probatio.Optional("count"): int,
                 }
             ),
         )
@@ -184,13 +136,15 @@ class TestFormatTool:
         assert parameters["required"] == ["name"]
 
     def test_ranges_and_lists(self) -> None:
-        """`vol.All`/`vol.Range` and list schemas convert to JSON schema keywords."""
+        """`All`/`Range` and list schemas convert to JSON schema keywords."""
         tool = StubTool(
             "Ranged",
-            parameters=vol.Schema(
+            parameters=probatio.Schema(
                 {
-                    vol.Optional("brightness"): vol.All(int, vol.Range(min=0, max=100)),
-                    vol.Optional("domain"): [str],
+                    probatio.Optional("brightness"): probatio.All(
+                        int, probatio.Range(min=0, max=100)
+                    ),
+                    probatio.Optional("domain"): [str],
                 }
             ),
         )
@@ -205,10 +159,12 @@ class TestFormatTool:
         assert properties["domain"] == {"type": "array", "items": {"type": "string"}}
 
     def test_enum_schema(self) -> None:
-        """`vol.In` becomes an enum."""
+        """`In` becomes an enum."""
         tool = StubTool(
             "Enumerated",
-            parameters=vol.Schema({vol.Required("mode"): vol.In(["heat", "cool"])}),
+            parameters=probatio.Schema(
+                {probatio.Required("mode"): probatio.In(["heat", "cool"])}
+            ),
         )
 
         properties = tool_registry.format_tool(tool, None)["parameters"]["properties"]
@@ -219,8 +175,8 @@ class TestFormatTool:
         """A nested mapping converts recursively."""
         tool = StubTool(
             "Nested",
-            parameters=vol.Schema(
-                {vol.Required("target"): {vol.Optional("entity_id"): str}}
+            parameters=probatio.Schema(
+                {probatio.Required("target"): {probatio.Optional("entity_id"): str}}
             ),
         )
 
@@ -230,9 +186,9 @@ class TestFormatTool:
         assert properties["target"]["properties"] == {"entity_id": {"type": "string"}}
 
     def test_custom_serializer_is_used(self) -> None:
-        """The API instance's serializer resolves what plain voluptuous cannot.
+        """The API instance's serializer resolves what a plain schema cannot.
 
-        Home Assistant selectors reach `convert` as opaque validators; the
+        Home Assistant selectors reach `to_openapi` as opaque validators; the
         serializer is the only thing that can describe them. Its contract is the
         `UNSUPPORTED` sentinel, not `None` — returning `None` would make the
         whole schema serialise as null.
@@ -247,10 +203,11 @@ class TestFormatTool:
         def serializer(schema: Any) -> Any:
             if isinstance(schema, Selector):
                 return {"type": "string", "enum": ["kitchen", "bedroom"]}
-            return UNSUPPORTED
+            return probatio.UNSUPPORTED
 
         tool = StubTool(
-            "Selected", parameters=vol.Schema({vol.Required("area"): selector})
+            "Selected",
+            parameters=probatio.Schema({probatio.Required("area"): selector}),
         )
 
         without = tool_registry.format_tool(tool, None)["parameters"]
@@ -273,7 +230,7 @@ class TestFormatTool:
             raise RuntimeError("cannot serialise")
 
         tool = StubTool(
-            "Broken", parameters=vol.Schema({vol.Required("x"): Exploding()})
+            "Broken", parameters=probatio.Schema({probatio.Required("x"): Exploding()})
         )
 
         described = tool_registry.format_tool(tool, serializer)
@@ -659,13 +616,17 @@ class TestValidateToolArgs:
 
     def test_valid_args_pass(self) -> None:
         """Matching arguments raise nothing."""
-        tool = StubTool("Tool", parameters=vol.Schema({vol.Required("name"): str}))
+        tool = StubTool(
+            "Tool", parameters=probatio.Schema({probatio.Required("name"): str})
+        )
 
         tool_registry.validate_tool_args(tool, {"name": "kitchen"})
 
     def test_missing_required_arg(self) -> None:
         """A missing required key names the tool and the key."""
-        tool = StubTool("Tool", parameters=vol.Schema({vol.Required("name"): str}))
+        tool = StubTool(
+            "Tool", parameters=probatio.Schema({probatio.Required("name"): str})
+        )
 
         with pytest.raises(ServiceValidationError) as err:
             tool_registry.validate_tool_args(tool, {})
@@ -675,44 +636,21 @@ class TestValidateToolArgs:
 
     def test_wrong_type(self) -> None:
         """A value of the wrong type is rejected."""
-        tool = StubTool("Tool", parameters=vol.Schema({vol.Required("count"): int}))
+        tool = StubTool(
+            "Tool", parameters=probatio.Schema({probatio.Required("count"): int})
+        )
 
         with pytest.raises(ServiceValidationError):
             tool_registry.validate_tool_args(tool, {"count": "not a number"})
 
     def test_unexpected_key(self) -> None:
         """An argument the tool never declared is rejected."""
-        tool = StubTool("Tool", parameters=vol.Schema({vol.Optional("name"): str}))
+        tool = StubTool(
+            "Tool", parameters=probatio.Schema({probatio.Optional("name"): str})
+        )
 
         with pytest.raises(ServiceValidationError):
             tool_registry.validate_tool_args(tool, {"nope": 1})
-
-    def test_probatio_schema_rejection_is_a_validation_error(self) -> None:
-        """A probatio schema's own `Invalid` reaches the caller as a HA error.
-
-        `probatio.Invalid` does not subclass `voluptuous.Invalid`, so catching
-        only the latter let a 2026.10 core's rejection escape as a raw
-        `MultipleInvalid` — the unreadable trace this function exists to avoid.
-        """
-        probatio = pytest.importorskip("probatio")
-        tool = StubTool(
-            "Tool", parameters=probatio.Schema({probatio.Required("name"): str})
-        )
-
-        with pytest.raises(ServiceValidationError) as err:
-            tool_registry.validate_tool_args(tool, {})
-
-        assert "Tool" in str(err.value)
-        assert "name" in str(err.value)
-
-    def test_probatio_valid_args_pass(self) -> None:
-        """Matching arguments raise nothing under a probatio schema either."""
-        probatio = pytest.importorskip("probatio")
-        tool = StubTool(
-            "Tool", parameters=probatio.Schema({probatio.Required("name"): str})
-        )
-
-        tool_registry.validate_tool_args(tool, {"name": "kitchen"})
 
 
 # =============================================================================
@@ -760,7 +698,9 @@ class TestCallTool:
         """
         tool = StubTool(
             "Coercing",
-            parameters=vol.Schema({vol.Required("count"): vol.Coerce(int)}),
+            parameters=probatio.Schema(
+                {probatio.Required("count"): probatio.Coerce(int)}
+            ),
         )
         register_api("assist", "Assist", [tool])
 
@@ -774,7 +714,9 @@ class TestCallTool:
         self, mock_hass: MagicMock, llm_context: Any, register_api: Any
     ) -> None:
         """The tool is dispatched through the API instance with a ToolInput."""
-        tool = StubTool("HassTurnOn", parameters=vol.Schema({vol.Optional("a"): int}))
+        tool = StubTool(
+            "HassTurnOn", parameters=probatio.Schema({probatio.Optional("a"): int})
+        )
         register_api("assist", "Assist", [tool])
 
         await tool_registry.async_call_tool(
@@ -813,7 +755,9 @@ class TestCallTool:
         self, mock_hass: MagicMock, llm_context: Any, register_api: Any
     ) -> None:
         """Bad arguments fail before the tool runs."""
-        tool = StubTool("Strict", parameters=vol.Schema({vol.Required("name"): str}))
+        tool = StubTool(
+            "Strict", parameters=probatio.Schema({probatio.Required("name"): str})
+        )
         register_api("assist", "Assist", [tool])
 
         with pytest.raises(ServiceValidationError):

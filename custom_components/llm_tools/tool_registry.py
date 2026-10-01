@@ -18,7 +18,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-import voluptuous as vol
+import probatio
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import llm
@@ -28,64 +28,6 @@ from .const import DEFAULT_ASSISTANT, DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 EMPTY_PARAMETERS: dict[str, Any] = {"type": "object", "properties": {}}
-
-try:  # Home Assistant 2026.10+
-    from probatio import Invalid as _ProbatioInvalid
-    from probatio import to_openapi as _probatio_to_openapi
-except ImportError:  # pragma: no cover - exercised by the other branch
-    _ProbatioInvalid = None
-    _probatio_to_openapi = None
-
-try:  # Home Assistant 2026.9 and earlier
-    from voluptuous_openapi import convert as _vol_openapi_convert
-except ImportError:  # pragma: no cover - exercised by the other branch
-    _vol_openapi_convert = None
-
-# Neither library's `Invalid` subclasses the other's, so a schema rejection has
-# to be caught under both names for the same reason `_to_openapi` dispatches on
-# the schema in hand.
-SCHEMA_INVALID: tuple[type[Exception], ...] = tuple(
-    error for error in (vol.Invalid, _ProbatioInvalid) if error is not None
-)
-
-
-def _to_openapi(schema: Any, custom_serializer: Any) -> dict[str, Any]:
-    """Serialize a tool's schema to OpenAPI, whichever library produced it.
-
-    Home Assistant is mid-migration from voluptuous to probatio: 2026.9 hands
-    out `voluptuous.Schema` and ships `voluptuous-openapi`, while the 2026.10
-    development branch imports `to_openapi` from probatio and has dropped
-    voluptuous from requirements.txt. Neither serializer accepts the other's
-    schema — probatio raises TypeError on a voluptuous Schema — so the choice
-    has to follow the object in hand rather than what happens to be installed.
-
-    An unrecognised schema tries every serializer available, since a future
-    core may hand out something neither branch anticipates.
-    """
-    serializers = _serializers_for(type(schema))
-    if not serializers:
-        raise RuntimeError(
-            "No schema serializer available; declare probatio or "
-            "voluptuous-openapi in manifest.json requirements"
-        )
-    last_error: Exception | None = None
-    for serialize in serializers:
-        try:
-            return serialize(schema, custom_serializer=custom_serializer)
-        except Exception as err:  # noqa: BLE001 - try the next serializer
-            last_error = err
-    raise last_error  # type: ignore[misc]
-
-
-def _serializers_for(schema_type: type) -> list[Any]:
-    """Order the available serializers, most likely to work first."""
-    probatio_first = schema_type.__module__.partition(".")[0] == "probatio"
-    ordered = (
-        [_probatio_to_openapi, _vol_openapi_convert]
-        if probatio_first
-        else [_vol_openapi_convert, _probatio_to_openapi]
-    )
-    return [fn for fn in ordered if fn is not None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,14 +77,14 @@ def format_tool(
 ) -> dict[str, Any]:
     """Describe one tool as a JSON-serialisable dict.
 
-    `parameters` is the tool's voluptuous schema rendered as an OpenAPI/JSON
+    `parameters` is the tool's probatio schema rendered as an OpenAPI/JSON
     schema, the same conversion the `mcp_server` integration performs, so what a
     caller reads here is what an LLM would have been shown.
 
     Args:
         tool: The tool to describe.
         custom_serializer: The owning API instance's serializer, which resolves
-            Home Assistant selectors that plain voluptuous cannot express.
+            Home Assistant selectors that a plain schema cannot express.
 
     Returns:
         A dict with `name`, `title`, `description`, `annotations` and
@@ -156,7 +98,9 @@ def format_tool(
         "annotations": dataclasses.asdict(tool.annotations),
     }
     try:
-        described["parameters"] = _to_openapi(tool.parameters, custom_serializer)
+        described["parameters"] = probatio.to_openapi(
+            tool.parameters, custom_serializer=custom_serializer
+        )
     # Third-party schemas are arbitrary; a listing must survive a bad one.
     except Exception as err:
         _LOGGER.warning("Could not convert parameters of tool %s: %s", tool.name, err)
@@ -405,7 +349,7 @@ def validate_tool_args(tool: llm.Tool, args: dict[str, Any]) -> None:
     """
     try:
         tool.parameters(args)
-    except SCHEMA_INVALID as err:
+    except probatio.Invalid as err:
         raise ServiceValidationError(
             f"Invalid arguments for tool '{tool.name}': {err}"
         ) from err

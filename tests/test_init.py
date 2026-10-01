@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
+import probatio
 import pytest
-import voluptuous as vol
 import yaml
 from conftest import (
     CALL_TOOL_SCHEMA,
@@ -75,7 +75,7 @@ class TestServiceSchemas:
 
     def test_tool_is_required(self) -> None:
         """call_tool without a tool name is rejected by the schema."""
-        with pytest.raises(vol.Invalid):
+        with pytest.raises(probatio.Invalid):
             CALL_TOOL_SCHEMA({})
 
     def test_args_default_to_empty(self) -> None:
@@ -84,7 +84,7 @@ class TestServiceSchemas:
 
     def test_args_must_be_an_object(self) -> None:
         """A list of arguments is rejected up front."""
-        with pytest.raises(vol.Invalid):
+        with pytest.raises(probatio.Invalid):
             CALL_TOOL_SCHEMA({"tool": "X", "api_id": "assist", "args": [1, 2]})
 
     def test_call_tool_takes_only_its_own_fields(self) -> None:
@@ -108,7 +108,7 @@ class TestServiceSchemas:
         `build_llm_context()` still takes all three; exposing one is a schema
         change with no code behind it.
         """
-        with pytest.raises(vol.Invalid):
+        with pytest.raises(probatio.Invalid):
             schema({"tool": "X", "api_id": "assist", field: "x"})
 
 
@@ -439,7 +439,7 @@ class TestCallToolService:
         point an untouched automation started failing, so the schema now
         rejects the call instead.
         """
-        with pytest.raises(vol.Invalid):
+        with pytest.raises(probatio.Invalid):
             CALL_TOOL_SCHEMA({"tool": "Shared", "args": {}})
 
     async def test_invalid_args_raise_validation_error(
@@ -449,7 +449,12 @@ class TestCallToolService:
         register_api(
             "assist",
             "Assist",
-            [StubTool("Strict", parameters=vol.Schema({vol.Required("name"): str}))],
+            [
+                StubTool(
+                    "Strict",
+                    parameters=probatio.Schema({probatio.Required("name"): str}),
+                )
+            ],
         )
         handlers = await setup_services(mock_hass)
 

@@ -7,8 +7,8 @@ Home Assistant is not installed here, so its modules are mocked before
 real helper — the registry, `async_get_api`'s "API not found" error, and the
 `Tool` / `API` / `APIInstance` / `ToolInput` / `ToolResult` / `LLMContext` shapes. Everything
 this integration does is a statement about that helper's behaviour, so a stand-in
-that only records calls would test nothing. `voluptuous`, `voluptuous_openapi` and `probatio`
-are the real libraries for the same reason.
+that only records calls would test nothing. `probatio` is the real library for
+the same reason.
 """
 
 from __future__ import annotations
@@ -25,14 +25,10 @@ from unittest.mock import MagicMock
 # Real libraries: schema conversion is behaviour under test, not a detail.
 import probatio as _real_probatio
 import pytest
-import voluptuous as _real_vol
-import voluptuous_openapi as _real_vol_openapi
 
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-sys.modules["voluptuous"] = _real_vol
-sys.modules["voluptuous_openapi"] = _real_vol_openapi
 sys.modules["probatio"] = _real_probatio
 
 # =============================================================================
@@ -148,9 +144,9 @@ mock_exceptions.ServiceValidationError = _MockServiceValidationError
 def _mock_cv_string(value: Any) -> str:
     """Mirror cv.string closely enough for the service schemas."""
     if value is None:
-        raise _real_vol.Invalid("string value is None")
+        raise _real_probatio.Invalid("string value is None")
     if isinstance(value, list | dict):
-        raise _real_vol.Invalid("value should be a string")
+        raise _real_probatio.Invalid("value should be a string")
     return str(value)
 
 
@@ -212,7 +208,7 @@ class _MockTool:
     name: str
     title: str | None = None
     description: str | None = None
-    parameters: Any = _real_vol.Schema({})
+    parameters: Any = _real_probatio.Schema({})
     annotations: _MockToolAnnotations = _MockToolAnnotations()
     integration: str | None = None
 

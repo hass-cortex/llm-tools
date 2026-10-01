@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import voluptuous as vol
+import probatio
 from homeassistant.config_entries import SIGNAL_CONFIG_ENTRY_CHANGED, ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import (
@@ -58,13 +58,15 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 # `intent__Hass*Timer` tools are unreachable — is in README's *`LLMContext` is
 # not exposed*.
 
-LIST_APIS_SCHEMA = vol.Schema({})
+LIST_APIS_SCHEMA = probatio.Schema({})
 
-LIST_TOOLS_SCHEMA = vol.Schema(
+LIST_TOOLS_SCHEMA = probatio.Schema(
     {
-        vol.Optional(ATTR_API_ID): cv.string,
-        vol.Optional(ATTR_SEARCH): cv.string,
-        vol.Optional(ATTR_LIMIT): vol.All(vol.Coerce(int), vol.Range(min=1)),
+        probatio.Optional(ATTR_API_ID): cv.string,
+        probatio.Optional(ATTR_SEARCH): cv.string,
+        probatio.Optional(ATTR_LIMIT): probatio.All(
+            probatio.Coerce(int), probatio.Range(min=1)
+        ),
     }
 )
 
@@ -72,11 +74,11 @@ LIST_TOOLS_SCHEMA = vol.Schema(
 # omitting it means "every API" and cannot be ambiguous. Resolving a bare tool
 # name across APIs was convenient until a second API registered the same name:
 # the automation that relied on it then broke without being touched.
-CALL_TOOL_SCHEMA = vol.Schema(
+CALL_TOOL_SCHEMA = probatio.Schema(
     {
-        vol.Required(ATTR_API_ID): cv.string,
-        vol.Required(ATTR_TOOL): cv.string,
-        vol.Optional(ATTR_ARGS, default=dict): dict,
+        probatio.Required(ATTR_API_ID): cv.string,
+        probatio.Required(ATTR_TOOL): cv.string,
+        probatio.Optional(ATTR_ARGS, default=dict): dict,
     }
 )
 
