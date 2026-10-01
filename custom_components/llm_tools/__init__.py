@@ -225,14 +225,16 @@ def _async_register_services(hass: HomeAssistant) -> None:
         # non-object as {"result": ...} made that key indistinguishable from a
         # tool that genuinely returns one, so a tool that breaks Home
         # Assistant's "a ServiceResponse is a JSON object" rule is named
-        # instead of being papered over.
-        if not isinstance(result, dict):
+        # instead of being papered over. An `error`-flagged result is returned
+        # too: its `data` is what the automation needs to react to the failure.
+        data = result.data
+        if not isinstance(data, dict):
             raise HomeAssistantError(
                 f"Tool '{call.data[ATTR_TOOL]}' returned "
-                f"{type(result).__name__}, not an object; a service response "
+                f"{type(data).__name__}, not an object; a service response "
                 f"has to be a JSON object"
             )
-        return result
+        return data
 
     hass.services.async_register(
         DOMAIN,

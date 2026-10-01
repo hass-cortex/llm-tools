@@ -28,6 +28,7 @@ from conftest import (
     setup_services,
 )
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import llm
 
 COMPONENT_DIR = Path(__file__).parent.parent / "custom_components" / "llm_tools"
 
@@ -346,6 +347,23 @@ class TestCallToolService:
         )
 
         assert response == {"success": True}
+
+    async def test_error_result_returns_its_data(
+        self, mock_hass: MagicMock, register_api: Any
+    ) -> None:
+        """An error-flagged result is the tool's data, so an automation can react."""
+        failed = llm.ToolResult(
+            data={"isError": True, "content": [{"type": "text", "text": "no"}]},
+            error=True,
+        )
+        register_api("assist", "Assist", [StubTool("Flaky", result=failed)])
+        handlers = await setup_services(mock_hass)
+
+        response = await handlers[SERVICE_CALL_TOOL](
+            make_call(mock_hass, {"tool": "Flaky", "api_id": "assist", "args": {}})
+        )
+
+        assert response == failed.data
 
     async def test_non_dict_result_names_the_tool(
         self, mock_hass: MagicMock, register_api: Any

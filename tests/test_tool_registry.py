@@ -14,6 +14,7 @@ from conftest import (
     tool_registry,
 )
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import llm
 from voluptuous_openapi import UNSUPPORTED
 
 # =============================================================================
@@ -128,6 +129,31 @@ class TestFormatTool:
             "properties": {},
             "required": [],
         }
+
+    def test_title_and_annotations_are_reported(self) -> None:
+        """The title and behaviour hints an MCP client would see are passed through."""
+        tool = StubTool(
+            "Read",
+            title="Read things",
+            annotations=llm.ToolAnnotations(read_only=True, destructive=False),
+        )
+
+        described = tool_registry.format_tool(tool, None)
+
+        assert described["title"] == "Read things"
+        assert described["annotations"] == {
+            "read_only": True,
+            "destructive": False,
+            "idempotent": False,
+            "open_world": True,
+        }
+
+    def test_undeclared_annotations_are_the_least_safe_defaults(self) -> None:
+        """A tool that declares nothing reports core's defaults and no title."""
+        described = tool_registry.format_tool(StubTool("Plain"), None)
+
+        assert described["title"] is None
+        assert described["annotations"]["destructive"] is True
 
     def test_description_is_reported(self) -> None:
         """The description an LLM would see is passed through."""
@@ -700,7 +726,7 @@ class TestCallTool:
     async def test_returns_the_tool_result(
         self, mock_hass: MagicMock, llm_context: Any, register_api: Any
     ) -> None:
-        """Whatever the tool returns comes back untouched."""
+        """Whatever the tool returns comes back untouched, as a ToolResult."""
         tool = StubTool("HassTurnOn", result={"success": True, "id": 7})
         register_api("assist", "Assist", [tool])
 
@@ -708,7 +734,20 @@ class TestCallTool:
             mock_hass, llm_context, "HassTurnOn", {}
         )
 
-        assert result == {"success": True, "id": 7}
+        assert result == llm.ToolResult(data={"success": True, "id": 7})
+
+    async def test_error_result_is_returned_not_raised(
+        self, mock_hass: MagicMock, llm_context: Any, register_api: Any
+    ) -> None:
+        """A tool that reports its own failure ran; the result says so."""
+        failed = llm.ToolResult(data={"error": "offline"}, error=True)
+        register_api("assist", "Assist", [StubTool("Flaky", result=failed)])
+
+        result = await tool_registry.async_call_tool(
+            mock_hass, llm_context, "Flaky", {}
+        )
+
+        assert result is failed
 
     async def test_arguments_reach_the_tool_unchanged(
         self, mock_hass: MagicMock, llm_context: Any, register_api: Any

@@ -2,7 +2,7 @@
 
 [![GitHub Release](https://img.shields.io/github/v/release/hass-cortex/llm-tools)](https://github.com/hass-cortex/llm-tools/releases)
 [![HACS](https://img.shields.io/badge/HACS-Custom-blue.svg)](https://hacs.xyz/)
-[![HA Version](https://img.shields.io/badge/HA-2026.8.0+-green.svg)](https://www.home-assistant.io/)
+[![HA Version](https://img.shields.io/badge/HA-2026.10.0+-green.svg)](https://www.home-assistant.io/)
 [![GitHub License](https://img.shields.io/github/license/hass-cortex/llm-tools)](https://github.com/hass-cortex/llm-tools/blob/main/LICENSE)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/hass-cortex/llm-tools)
 
@@ -130,7 +130,7 @@ calendars surface.
 
 ## Getting Started
 
-**Prerequisites:** Home Assistant **2026.8.0+**, and at least one integration
+**Prerequisites:** Home Assistant **2026.10.0+**, and at least one integration
 that registers an LLM API.
 
 ### 1. Install
@@ -175,7 +175,7 @@ with "LLM Tools is not set up" rather than silently doing nothing.
 | Action | Response | Purpose |
 |--------|----------|---------|
 | `llm_tools.list_apis` | always | Every registered LLM API: `id`, `name`, `tool_count` |
-| `llm_tools.list_tools` | always | Each tool's `name`, `description` and `parameters` as a JSON schema |
+| `llm_tools.list_tools` | always | Each tool's `name`, `title`, `description`, `annotations` and `parameters` as a JSON schema |
 | `llm_tools.call_tool` | optional | Runs one tool and returns its result |
 
 ### `list_apis`
@@ -214,7 +214,9 @@ and an `error` — one broken provider cannot hide the rest.
   response_variable: catalogue
 # catalogue.tools == [
 #   {"api_id": "mcp-notion", "api_name": "Notion", "name": "notion-create-pages",
-#    "description": "Creates one or more pages ...",
+#    "title": "Create pages", "description": "Creates one or more pages ...",
+#    "annotations": {"read_only": false, "destructive": false,
+#                    "idempotent": false, "open_world": true},
 #    "parameters": {"type": "object", "properties": {...}, "required": [...]}},
 #   ...
 # ]
@@ -222,7 +224,8 @@ and an `error` — one broken provider cannot hide the rest.
 
 `parameters` is the tool's schema rendered as a JSON schema — the same
 description a conversation agent is given, so what you read here is exactly what
-the tool accepts.
+the tool accepts. `annotations` are the tool's behaviour hints; a tool that
+declares none reports Home Assistant's least-safe defaults, and `title` is `null`.
 
 ### `call_tool`
 
@@ -283,7 +286,9 @@ an integration that never registered an action for it.
 **The response is the tool's own object, verbatim.** Nothing is wrapped and no
 key is invented. A tool returning something other than an object fails with a
 message naming it, since Home Assistant requires an action response to be an
-object. Omit `response_variable` if you do not need the result.
+object. A tool that reports its own failure — an MCP result with `isError` — is
+not raised: its object is the response, so the automation can react to it. Omit
+`response_variable` if you do not need the result.
 
 ## Errors
 

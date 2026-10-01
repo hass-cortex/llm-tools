@@ -5,7 +5,7 @@ Home Assistant is not installed here, so its modules are mocked before
 
 `homeassistant.helpers.llm` is not a MagicMock but a faithful miniature of the
 real helper — the registry, `async_get_api`'s "API not found" error, and the
-`Tool` / `API` / `APIInstance` / `ToolInput` / `LLMContext` shapes. Everything
+`Tool` / `API` / `APIInstance` / `ToolInput` / `ToolResult` / `LLMContext` shapes. Everything
 this integration does is a statement about that helper's behaviour, so a stand-in
 that only records calls would test nothing. `voluptuous`, `voluptuous_openapi` and `probatio`
 are the real libraries for the same reason.
@@ -188,12 +188,33 @@ class _MockToolInput:
     external: bool = False
 
 
+@dataclasses.dataclass(slots=True)
+class _MockToolResult:
+    """Mirror of llm.ToolResult."""
+
+    data: Any
+    error: bool = False
+
+
+@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
+class _MockToolAnnotations:
+    """Mirror of llm.ToolAnnotations, defaulting to the least safe case."""
+
+    read_only: bool = False
+    destructive: bool = True
+    idempotent: bool = False
+    open_world: bool = True
+
+
 class _MockTool:
     """Mirror of llm.Tool, including the empty default parameters schema."""
 
     name: str
+    title: str | None = None
     description: str | None = None
     parameters: Any = _real_vol.Schema({})
+    annotations: _MockToolAnnotations = _MockToolAnnotations()
+    integration: str | None = None
 
     async def async_call(
         self, hass: Any, tool_input: _MockToolInput, llm_context: _MockLLMContext
@@ -209,7 +230,7 @@ class _MockAPIInstance:
     Core's `async_call_tool` looks the tool up by name and calls it. It does
     *not* validate `tool_args` against the tool's schema, and the mock must not
     either, or the integration's own validation would be tested against a
-    strawman.
+    strawman. A tool returning a bare object is wrapped in a `ToolResult`.
     """
 
     api: Any
@@ -218,14 +239,17 @@ class _MockAPIInstance:
     tools: list[Any]
     custom_serializer: Callable[[Any], Any] | None = None
 
-    async def async_call_tool(self, tool_input: _MockToolInput) -> Any:
+    async def async_call_tool(self, tool_input: _MockToolInput) -> _MockToolResult:
         """Call a tool by name."""
         for tool in self.tools:
             if tool.name == tool_input.tool_name:
                 break
         else:
             raise _MockHomeAssistantError(f'Tool "{tool_input.tool_name}" not found')
-        return await tool.async_call(self.api.hass, tool_input, self.llm_context)
+        result = await tool.async_call(self.api.hass, tool_input, self.llm_context)
+        if isinstance(result, _MockToolResult):
+            return result
+        return _MockToolResult(data=result)
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -288,6 +312,8 @@ mock_helpers_llm.APIInstance = _MockAPIInstance  # type: ignore[attr-defined]
 mock_helpers_llm.LLMContext = _MockLLMContext  # type: ignore[attr-defined]
 mock_helpers_llm.Tool = _MockTool  # type: ignore[attr-defined]
 mock_helpers_llm.ToolInput = _MockToolInput  # type: ignore[attr-defined]
+mock_helpers_llm.ToolResult = _MockToolResult  # type: ignore[attr-defined]
+mock_helpers_llm.ToolAnnotations = _MockToolAnnotations  # type: ignore[attr-defined]
 mock_helpers_llm.LLM_API_ASSIST = "assist"  # type: ignore[attr-defined]
 mock_helpers_llm.async_register_api = _mock_async_register_api  # type: ignore[attr-defined]
 mock_helpers_llm.async_get_apis = _mock_async_get_apis  # type: ignore[attr-defined]
@@ -414,16 +440,21 @@ class StubTool(_MockTool):
         self,
         name: str,
         *,
+        title: str | None = None,
         description: str | None = None,
         parameters: Any = None,
+        annotations: _MockToolAnnotations | None = None,
         result: Any = None,
         error: Exception | None = None,
     ) -> None:
         """Init the stub."""
         self.name = name
+        self.title = title
         self.description = description
         if parameters is not None:
             self.parameters = parameters
+        if annotations is not None:
+            self.annotations = annotations
         self.result = {"success": True} if result is None else result
         self.error = error
         self.calls: list[tuple[Any, _MockToolInput, _MockLLMContext]] = []

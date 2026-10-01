@@ -12,6 +12,7 @@ running a tool raises `HomeAssistantError`.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -144,13 +145,15 @@ def format_tool(
             Home Assistant selectors that plain voluptuous cannot express.
 
     Returns:
-        A dict with `name`, `description` and `parameters`. A schema that cannot
-        be converted yields empty parameters plus an `error` key rather than
-        failing the whole listing.
+        A dict with `name`, `title`, `description`, `annotations` and
+        `parameters`. A schema that cannot be converted yields empty parameters
+        plus an `error` key rather than failing the whole listing.
     """
     described: dict[str, Any] = {
         "name": tool.name,
+        "title": tool.title,
         "description": tool.description or "",
+        "annotations": dataclasses.asdict(tool.annotations),
     }
     try:
         described["parameters"] = _to_openapi(tool.parameters, custom_serializer)
@@ -288,9 +291,10 @@ async def async_list_tools(
             together.
 
     Returns:
-        One dict per tool: `api_id`, `api_name`, `name`, `description`,
-        `parameters`. Name matches come first; within a rank the registration
-        order of the APIs and their tools is preserved.
+        One dict per tool: `api_id`, `api_name`, `name`, `title`,
+        `description`, `annotations`, `parameters`. Name matches come first;
+        within a rank the registration order of the APIs and their tools is
+        preserved.
 
     Raises:
         ServiceValidationError: `api_id` names an API that is not registered.
@@ -413,7 +417,7 @@ async def async_call_tool(
     tool_name: str,
     args: dict[str, Any],
     api_id: str | None = None,
-) -> Any:
+) -> llm.ToolResult:
     """Resolve and run one LLM tool, with no conversation agent involved.
 
     Args:
@@ -424,7 +428,8 @@ async def async_call_tool(
         api_id: Restrict the search to a single API.
 
     Returns:
-        Whatever the tool returned, normally a JSON object.
+        The tool's result. A result flagged `error` is returned, not raised:
+        the tool ran and reported its own failure in `data`.
 
     Raises:
         ServiceValidationError: Unknown API, unknown or ambiguous tool, or
