@@ -213,7 +213,8 @@ class TestFormatTool:
         without = tool_registry.format_tool(tool, None)["parameters"]
         with_serializer = tool_registry.format_tool(tool, serializer)["parameters"]
 
-        assert without["properties"]["area"] == {"type": "string"}
+        # An un-hinted validator is "any value" to probatio: the open schema.
+        assert without["properties"]["area"] == {}
         assert with_serializer["properties"]["area"] == {
             "type": "string",
             "enum": ["kitchen", "bedroom"],
