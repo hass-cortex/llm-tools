@@ -325,7 +325,3 @@ Download diagnostics) for the API list and the context it was read under.
   differently from the LLM path.
 - **No conversation trace.** Tool calls appear in the automation trace, not under
   Settings → Voice assistants → debug.
-
-## License
-
-[MIT](./LICENSE)
