@@ -1,6 +1,6 @@
 [project]
 name = "llm-tools"
-version = "0.1.0"
+version = "0.1.1"
 description = "Run an MCP tool from Home Assistant without an agent - call any LLM tool by name from an automation, script, sentence trigger or dashboard button"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -87,7 +87,7 @@ exclude_lines = [
 ]
 
 [tool.commitizen]
-version = "0.1.0"
+version = "0.1.1"
 version_files = [
     "pyproject.toml:version",
     "custom_components/llm_tools/manifest.json:version",
